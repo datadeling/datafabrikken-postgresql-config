@@ -1,0 +1,6 @@
+# Default values for PostgreSQL-sqlproxy.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+DATAFABRIKKEN_POSTGRESQL_MEMORY: "10Mi"
+DATAFABRIKKEN_POSTGRESQL_IMAGE: gcr.io/cloudsql-docker/gce-proxy:1.27.1

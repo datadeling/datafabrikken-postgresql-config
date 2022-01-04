@@ -1,0 +1,77 @@
+# Copyright 2018 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    fdk.service: postgresql-sqlproxy
+  name: postgresql-sqlproxy
+  namespace: {{ required "Missing value NAMESPACE" .Values.NAMESPACE }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      fdk.service: postgresql-sqlproxy
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        fdk.service: postgresql-sqlproxy
+    spec:
+      volumes:
+        - name: google-cloud-key
+          secret:
+            defaultMode: 420
+            secretName: postgres-{{ required "Missing value NAMESPACE" .Values.NAMESPACE }}-key
+        - name: ssl-certs
+          hostPath:
+            path: /etc/ssl/certs
+      containers:
+        - env:
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: /var/secrets/google/key.json
+          image: {{ required "Missing value DATAFABRIKKEN_POSTGRESQL_IMAGE" .Values.DATAFABRIKKEN_POSTGRESQL_IMAGE }}
+          resources:
+            requests:
+              memory: {{ required "Missing value DATAFABRIKKEN_POSTGRESQL_MEMORY" .Values.DATAFABRIKKEN_POSTGRESQL_MEMORY | quote }}
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+            - name: google-cloud-key
+              mountPath: /var/secrets/google
+          command: ["/cloud_sql_proxy","-instances={{ required "Missing value DATAFABRIKKEN_SQL_PROXY_CLUSTER" .Values.DATAFABRIKKEN_SQL_PROXY_CLUSTER }}:europe-north1:{{ required "Missing value DATAFABRIKKEN_SQL" .Values.DATAFABRIKKEN_SQL }}-{{ required "Missing value DATAFABRIKKEN_SQL_PROXY_SQL_ENVIRONMENT" .Values.DATAFABRIKKEN_SQL_PROXY_SQL_ENVIRONMENT }}=tcp:0.0.0.0:5432"]
+          imagePullPolicy: Always
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          name: postgresql-sqlproxy
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          terminationMessagePath: /dev/termination-log
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
